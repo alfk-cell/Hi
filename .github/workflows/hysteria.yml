@@ -1,0 +1,44 @@
+name: Hysteria
+on: workflow_dispatch
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup
+        run: |
+          wget -q https://github.com/apernet/hysteria/releases/latest/download/hysteria-linux-amd64 -O /tmp/hysteria
+          chmod +x /tmp/hysteria
+          PASS=$(openssl rand -base64 16)
+          
+          openssl req -x509 -nodes -newkey ec:<(openssl ecparam -name prime256v1) \
+            -keyout /tmp/key.pem -out /tmp/cert.pem \
+            -days 365 -subj "/CN=www.bing.com" 2>/dev/null
+          
+          tee /tmp/config.yaml > /dev/null << EOF
+          listen: :5353
+          
+          tls:
+            cert: /tmp/cert.pem
+            key: /tmp/key.pem
+          
+          auth:
+            type: password
+            password: $PASS
+          
+          masquerade:
+            type: proxy
+            proxy:
+              url: https://www.bing.com/
+              rewriteHost: true
+          EOF
+          
+          echo ""
+          echo "========== INFO =========="
+          echo "IP: $(curl -s ifconfig.me)"
+          echo "Port: 5353"
+          echo "Password: $PASS"
+          echo "=========================="
+          echo ""
+          
+          /tmp/hysteria server -c /tmp/config.yaml &
+          sleep 3600
